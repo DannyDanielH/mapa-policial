@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa policial interactivo</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.92);
+      --panel-2: #0f172a;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --sky: #38bdf8;
+      --sky-2: #0ea5e9;
+      --shadow: 0 25px 60px rgba(0, 0, 0, 0.28);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0f172a 0%, var(--bg) 52%, #020617 100%);
+      color: var(--text);
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+
+    .container {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    .header {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 32px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .header-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 0.9fr;
+      gap: 18px;
+      align-items: end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      background: rgba(56, 189, 248, 0.08);
+      color: #7dd3fc;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      width: fit-content;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: #fff;
+    }
+
+    .lead {
+      margin: 14px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1rem;
+      max-width: 60ch;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      background: rgba(2, 6, 23, 0.55);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .coords-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+    }
+
+    .coords-box {
+      border-radius: 16px;
+      background: #0f172a;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #bfdbfe;
+      font-size: 0.95rem;
+      border: 1px solid #1e293b;
+      word-break: break-word;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--sky);
+      color: #082f49;
+    }
+    .btn-primary:hover { background: #7dd3fc; }
+    .btn-secondary {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-color: #334155;
+    }
+    .btn-secondary:hover {
+      border-color: #64748b;
+      background: #111827;
+    }
+    .btn-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 24px;
+    }
+
+    .section {
+      display: grid;
+      gap: 24px;
+    }
+
+    .input-card {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .input-wrap {
+      position: relative;
+      flex: 1 1 520px;
+      min-width: 280px;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 1rem;
+      pointer-events: none;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid #334155;
+      background: #020617;
+      color: #f8fafc;
+      padding: 14px 16px 14px 44px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      font-size: 0.98rem;
+    }
+
+    input[type="text"]::placeholder { color: #64748b; }
+    input[type="text"]:focus {
+      border-color: var(--sky-2);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    .hint {
+      margin: 12px 0 0;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .map-card {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .map-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .map-head h2, .legend-card h2, .legend-card h3 {
+      margin: 0;
+      color: #fff;
+    }
+
+    .map-head p, .legend-card p {
+      margin: 6px 0 0;
+      color: #94a3b8;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .small-link {
+      border: 1px solid #334155;
+      background: transparent;
+      color: #e2e8f0;
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .map-frame {
+      aspect-ratio: 16 / 10;
+      width: 100%;
+      background: #020617;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    .empty-map {
+      height: 100%;
+      min-height: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      text-align: center;
+      color: #94a3b8;
+    }
+
+    .legend-card {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .table-wrap {
+      margin-top: 16px;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid #1e293b;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.92rem;
+    }
+
+    thead { background: #020617; color: #cbd5e1; }
+    th, td { padding: 14px 16px; vertical-align: top; }
+    tbody tr:nth-child(odd) { background: #0f172a; }
+    tbody tr:nth-child(even) { background: rgba(2, 6, 23, 0.62); }
+
+    .legend-cell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .code { font-weight: 700; color: #f8fafc; }
+    .label-sm { font-size: 0.82rem; color: #94a3b8; margin-top: 2px; }
+    .detail { color: #cbd5e1; line-height: 1.55; }
+
+    .info-card {
+      border: 0px solid rgba(56, 189, 248, 0.18);
+      background: rgba(14, 165, 233, 0.12);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 2px;
+    }
+
+    .info-card h3 { color: #e0f2fe; }
+    .info-card p { color: rgba(240, 249, 255, 0.92); }
+
+    .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    @media (max-width: 980px) {
+      .header-grid, .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { width: min(100% - 20px, 1200px); }
+      .header, .input-card, .map-card, .legend-card, .info-card { border-radius: 22px; }
+      .map-head { flex-direction: column; align-items: flex-start; }
+      th, td { padding: 12px 12px; }
+      table { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-grid">
+        <div>
+          <div class="badge"><span>🛡️</span> Mapa policial interactivo</div>
+          <h1>Visualiza el mapa del delito - COM. PNP LA LIBERTAD</h1>
+          <!--<p class="lead">
+            Pega el enlace de Google Earth, revisa las coordenadas detectadas y usa la leyenda para ordenar sectores,
+            puntos críticos y referencias operativas.
+          </p> --><BR><BR>
+        </div>
+
+        <div class="card">
+          <div class="coords-title"><span class="icon">📍</span> Coordenadas de incidencias</div>
+          <div id="centerText" class="coords-box">No se detectaron coordenadas</div>
+          <div class="actions">
+           <!-- <a id="openEarthBtn" class="btn btn-primary btn-disabled" href="#" target="_blank" rel="noreferrer">
+              <span class="icon">↗</span> Abrir Google Earth
+            </a>-->
+            <a id="openMapsBtn" class="btn btn-secondary btn-disabled" href="#" target="_blank" rel="noreferrer">
+              <span class="icon">🗺️</span> Abrir en Maps
+            </a>
+            <button id="copyBtn" class="btn btn-secondary" type="button">
+              <span id="copyIcon" class="icon">⎘</span>
+              <span id="copyLabel">Copiar enlace</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="section">
+        <div class="input-card">
+          <label class="label" for="earthUrl">Enlace de Google Maps</label>
+          <div class="input-row">
+            <div class="input-wrap">
+              <span class="input-icon">🔗</span>
+              <input
+  id="earthUrl"
+  type="text" 
+  value="https://www.google.com/maps/d/u/0/edit?mid=1ayIJYaoGBvwGGIKOx_1wQUN1cazoB48&ll=-9.097541231390712,-78.56406663030191&z=14"
+/>
+            </div>
+           </div>
+       <!--  <p class="hint">
+            Google Earth Web no siempre se puede incrustar en una página. Esta versión extrae las coordenadas y muestra el punto en un mapa compatible.
+          </p> -->
+        </div>
+
+        <div class="map-card">
+          <div class="map-head">
+            <div>
+              <h2>Vista del mapa</h2>
+              <p>Ubicación centrada en el enlace proporcionado</p>
+            </div>
+            <a id="detailBtn" class="small-link" href="#" target="_blank" rel="noreferrer" style="display:none;">Ver detalle</a>
+          </div>
+
+          <div class="map-frame" id="mapFrameWrap">
+            <div id="emptyMap" class="empty-map">No se pudieron leer coordenadas del enlace.</div>
+            <iframe
+              id="mapFrame"
+              title="Mapa policial"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              style="display:none;"
+            ></iframe>
+          </div>
+        </div>
+      </section>
+
+      <aside class="section">
+        <div class="legend-card">
+          <h2>Leyenda operativa</h2>
+          <p>Tabla orientada a patrullaje, control y referencias geográficas.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Color</th>
+                  <th>Uso</th>
+                </tr>
+              </thead>
+              <tbody id="legendBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="info-card">
+           <center> <img src="Imag1.png" alt=""></center>
+    <!--      <h3>Ajuste sugerido para tu enlace</h3>
+          <p>
+            El enlace de Earth se usa para extraer la ubicación. La vista del mapa se genera aparte para que cargue
+            correctamente dentro de la página, sin depender de bloqueos de Google Earth.
+          </p>-->
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const earthInput = document.getElementById("earthUrl");
+    const centerText = document.getElementById("centerText");
+    const openEarthBtn = document.getElementById("openEarthBtn");
+    const openMapsBtn = document.getElementById("openMapsBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const copyIcon = document.getElementById("copyIcon");
+    const copyLabel = document.getElementById("copyLabel");
+    const mapFrame = document.getElementById("mapFrame");
+    const emptyMap = document.getElementById("emptyMap");
+    const detailBtn = document.getElementById("detailBtn");
+    const legendBody = document.getElementById("legendBody");
+
+    const baseLegend = [
+      { code: "AMARILLO", color: "#ca8a04", label: "Comisaría / base policial", detail: "Punto de control, referencia principal o dependencia policial." },
+      { code: "ROJO", color: "#dc2626", label: "Delito contra el patrimonio", detail: "Lugar de incidencia de robos y hurto." },
+      { code: "AZUL", color: "#1d4ed8", label: "Accidentes de transito", detail: "Lugar de incidencias de choques en estado de ebriedad." },
+      { code: "VERDE", color: "#16a34a", label: "Violencia familiar", detail: "Lugar de incidencia de violencia contra la mujer y los integrantes del grupo familiar." },
+      { code: "GRIS", color: "#6b7280", label: "Trafico de drogas", detail: "Lugar de incidencia de consumo de drogas." },
+      //{ code: "MORADO", color: "#7c3aed", label: "Referencia geográfica", detail: "Nombre de lugar, límite o referencia del sector." }, 
+    ];
+
+    function parseCoordinates(url) {
+      const match = url.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),/);
+      if (match) return { lat: Number(match[1]), lng: Number(match[2]) };
+
+      const queryMatch = url.match(/[?&](?:q|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+      if (queryMatch) return { lat: Number(queryMatch[1]), lng: Number(queryMatch[2]) };
+
+      return null;
+    }
+
+    function buildOpenStreetMapEmbed(lat, lng) {
+      const delta = 0.012;
+      const left = lng - delta;
+      const right = lng + delta;
+      const top = lat + delta;
+      const bottom = lat - delta;
+      return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lng}`;
+    }
+
+    function buildGoogleMapsSearch(lat, lng) {
+      return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    }
+
+    function updateMap() {
+  const url = earthInput.value.trim();
+
+  // Detectar Google My Maps
+  const myMapsMatch = url.match(/mid=([^&]+)/);
+
+  if (myMapsMatch) {
+    const mapId = myMapsMatch[1];
+
+    const embedUrl =
+      `https://www.google.com/maps/d/embed?mid=${mapId}`;
+
+    centerText.textContent =
+      "Mapa personalizado de Google My Maps";
+
+    mapFrame.src = embedUrl;
+    mapFrame.style.display = "block";
+    emptyMap.style.display = "none";
+
+    openMapsBtn.href =
+      `https://www.google.com/maps/d/viewer?mid=${mapId}`;
+
+    openMapsBtn.classList.remove("btn-disabled");
+
+    detailBtn.href =
+      `https://www.google.com/maps/d/viewer?mid=${mapId}`;
+
+    detailBtn.style.display = "inline-flex";
+
+    return;
+  }
+
+  // Compatibilidad con Google Earth
+  const coords = parseCoordinates(url);
+
+  if (coords) {
+    const center = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+
+    const embedUrl =
+      `https://www.google.com/maps?q=${coords.lat},${coords.lng}&z=15&output=embed`;
+
+    const searchUrl =
+      `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`;
+
+    centerText.textContent = center;
+
+    mapFrame.src = embedUrl;
+    mapFrame.style.display = "block";
+    emptyMap.style.display = "none";
+
+    openMapsBtn.href = searchUrl;
+    openMapsBtn.classList.remove("btn-disabled");
+
+    detailBtn.href = searchUrl;
+    detailBtn.style.display = "inline-flex";
+  } else {
+    centerText.textContent = "No se detectaron coordenadas";
+
+    mapFrame.style.display = "none";
+    emptyMap.style.display = "flex";
+
+    openMapsBtn.href = "#";
+    openMapsBtn.classList.add("btn-disabled");
+
+    detailBtn.style.display = "none";
+  }
+}
+
+    function renderLegend() {
+      legendBody.innerHTML = baseLegend.map((item) => `
+        <tr>
+          <td>
+            <div class="legend-cell">
+              <span class="dot" style="background:${item.color}"></span>
+              <div>
+                <div class="code">${item.code}</div>
+                <div class="label-sm">${item.label}</div>
+              </div>
+            </div>
+          </td>
+          <td class="detail">${item.detail}</td>
+        </tr>
+      `).join("");
+    }
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(earthInput.value.trim());
+        copyIcon.textContent = "✓";
+        copyLabel.textContent = "Copiado";
+      } catch (error) {
+        copyIcon.textContent = "!";
+        copyLabel.textContent = "No se pudo copiar";
+      }
+
+      setTimeout(() => {
+        copyIcon.textContent = "⎘";
+        copyLabel.textContent = "Copiar enlace";
+      }, 1500);
+    });
+
+    earthInput.addEventListener("input", updateMap);
+    renderLegend();
+    updateMap();
+  </script>
+</body>
+</html>
